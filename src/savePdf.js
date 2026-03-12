@@ -1,6 +1,8 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
+const PDF_RENDER_GUARD_TIMEOUT_MS = 12000;
+
 function sanitizeFilename(input) {
   return String(input)
     .normalize('NFKD')
@@ -34,6 +36,36 @@ async function chooseUniqueFilePath(outputDir, baseName) {
   return candidate;
 }
 
+async function waitForPdfRenderReady(page, timeoutMs = PDF_RENDER_GUARD_TIMEOUT_MS) {
+  await page.waitForLoadState('load', { timeout: timeoutMs }).catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: timeoutMs }).catch(() => {});
+
+  await page.evaluate(async ({ timeout }) => {
+    const withTimeout = (promise, ms) =>
+      Promise.race([
+        promise,
+        new Promise((resolve) => setTimeout(resolve, ms))
+      ]);
+
+    const fontsReady = document.fonts?.ready || Promise.resolve();
+    await withTimeout(fontsReady, Math.min(timeout, 5000));
+
+    const images = Array.from(document.images || []).filter((img) => img.currentSrc || img.src);
+    if (images.length === 0) return;
+
+    const waits = images.map((img) => {
+      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+      return new Promise((resolve) => {
+        const done = () => resolve();
+        img.addEventListener('load', done, { once: true });
+        img.addEventListener('error', done, { once: true });
+      });
+    });
+
+    await withTimeout(Promise.all(waits), timeout);
+  }, { timeout: timeoutMs });
+}
+
 async function savePdf(browser, { html, outputDir, preferredName, fallbackName }) {
   const fileName = await chooseUniqueFilePath(outputDir, preferredName || fallbackName);
   const outputPath = path.join(outputDir, fileName);
@@ -43,6 +75,7 @@ async function savePdf(browser, { html, outputDir, preferredName, fallbackName }
 
   try {
     await page.setContent(html, { waitUntil: 'load' });
+    await waitForPdfRenderReady(page);
     await page.emulateMedia({ media: 'print' });
     await page.pdf({
       path: outputPath,

@@ -1,6 +1,47 @@
 const { extractArticleDataFromHtml } = require('./extractMetadata');
 
 const NAVIGATION_TIMEOUT_MS = 45000;
+const RENDER_GUARD_TIMEOUT_MS = 12000;
+
+async function waitForRenderablePage(page, timeoutMs = RENDER_GUARD_TIMEOUT_MS) {
+  await page.waitForLoadState('domcontentloaded', { timeout: timeoutMs }).catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: timeoutMs }).catch(() => {});
+
+  await page.evaluate(async ({ timeout }) => {
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const withTimeout = (promise, ms) =>
+      Promise.race([
+        promise,
+        new Promise((resolve) => setTimeout(resolve, ms))
+      ]);
+
+    // Trigger common lazy-loading behavior by crossing viewport intersections.
+    try {
+      window.scrollTo(0, document.body.scrollHeight);
+      await delay(250);
+      window.scrollTo(0, 0);
+    } catch {
+      // Ignore scroll failures.
+    }
+
+    const fontsReady = document.fonts?.ready || Promise.resolve();
+    await withTimeout(fontsReady, Math.min(timeout, 5000));
+
+    const images = Array.from(document.images || []).filter((img) => img.currentSrc || img.src);
+    if (images.length === 0) return;
+
+    const imageWaits = images.map((img) => {
+      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+      return new Promise((resolve) => {
+        const done = () => resolve();
+        img.addEventListener('load', done, { once: true });
+        img.addEventListener('error', done, { once: true });
+      });
+    });
+
+    await withTimeout(Promise.all(imageWaits), timeout);
+  }, { timeout: timeoutMs });
+}
 
 async function extractArticle(browser, url, index) {
   const loadContext = await browser.newContext();
@@ -8,8 +49,7 @@ async function extractArticle(browser, url, index) {
 
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAVIGATION_TIMEOUT_MS });
-    await page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
-    await page.waitForTimeout(1200);
+    await waitForRenderablePage(page);
 
     const pageTitle = (await page.title()).trim();
     const html = await page.content();
