@@ -7,12 +7,17 @@
     "sources2pdf": "./cli.js"
   },
   "scripts": {
-    "start": "node cli.js"
+    "start": "node cli.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "commander": "^14.0.1",
     "jsdom": "^27.0.0",
     "playwright": "^1.52.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
   }
 }

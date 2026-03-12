@@ -1,14 +1,6 @@
-const { JSDOM } = require('jsdom');
-const { Readability } = require('@mozilla/readability');
+const { extractArticleDataFromHtml } = require('./extractMetadata');
 
 const NAVIGATION_TIMEOUT_MS = 45000;
-
-function normalizeDate(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
-}
 
 async function extractArticle(browser, url, index) {
   const loadContext = await browser.newContext();
@@ -22,41 +14,28 @@ async function extractArticle(browser, url, index) {
     const pageTitle = (await page.title()).trim();
     const html = await page.content();
     const finalUrl = page.url();
-    const document = new JSDOM(html, { url: finalUrl }).window.document;
+    const fallbackName = `${new URL(finalUrl).hostname}-${index}`;
 
-    const readability = new Readability(document);
-    const parsed = readability.parse();
+    const article = extractArticleDataFromHtml(html, {
+      url: finalUrl,
+      pageTitle,
+      fallbackTitle: fallbackName
+    });
 
-    if (!parsed || !parsed.content) {
+    if (!article.contentHtml) {
       throw new Error('Readability extraction failed');
     }
 
-    const doc = document;
-    const metadataPublished =
-      doc.querySelector('meta[property="article:published_time"]')?.getAttribute('content') ||
-      doc.querySelector('meta[name="pubdate"]')?.getAttribute('content') ||
-      doc.querySelector('meta[name="publish-date"]')?.getAttribute('content') ||
-      doc.querySelector('time')?.getAttribute('datetime') ||
-      null;
-
-    const siteName =
-      parsed.siteName ||
-      doc.querySelector('meta[property="og:site_name"]')?.getAttribute('content') ||
-      new URL(finalUrl).hostname;
-
-    const readabilityTitle = (parsed.title || '').trim();
-    const fallbackName = `${new URL(finalUrl).hostname}-${index}`;
-    const title = readabilityTitle || pageTitle || fallbackName;
-    const filenameTitle = pageTitle || readabilityTitle || fallbackName;
+    const filenameTitle = pageTitle || article.title || fallbackName;
 
     return {
-      title,
+      title: article.title,
       filenameTitle,
-      byline: parsed.byline || null,
-      siteName,
-      publishedDate: normalizeDate(metadataPublished),
-      contentHtml: parsed.content,
-      excerpt: parsed.excerpt || null,
+      byline: article.byline,
+      siteName: article.siteName,
+      articleDate: article.articleDate,
+      contentHtml: article.contentHtml,
+      excerpt: article.excerpt,
       url: finalUrl,
       fallbackName
     };

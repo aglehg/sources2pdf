@@ -1,0 +1,8 @@
+[
+  {
+    "id": "shopify-blog",
+    "rawHtmlPath": "tests/fixtures/raw/shopify-blog.html",
+    "expectedPath": "tests/fixtures/expected/shopify-blog.json",
+    "url": "https://www.shopify.com/blog/image-sizes"
+  }
+]

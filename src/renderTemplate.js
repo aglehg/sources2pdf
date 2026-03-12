@@ -10,8 +10,8 @@ function escapeHtml(value) {
 function buildPrintableHtml(article) {
   const title = escapeHtml(article.title || 'Untitled article');
   const byline = article.byline ? `<p class="meta-line"><strong>By:</strong> ${escapeHtml(article.byline)}</p>` : '';
-  const published = article.publishedDate
-    ? `<p class="meta-line"><strong>Published:</strong> ${escapeHtml(article.publishedDate)}</p>`
+  const articleDate = article.articleDate
+    ? `<p class="meta-line"><strong>Date:</strong> ${escapeHtml(article.articleDate)}</p>`
     : '';
   const excerpt = article.excerpt ? `<p class="excerpt">${escapeHtml(article.excerpt)}</p>` : '';
 
@@ -115,7 +115,7 @@ function buildPrintableHtml(article) {
             ${byline}
             <p class="meta-line"><strong>Source:</strong> ${escapeHtml(article.siteName || '')}</p>
             <p class="meta-line"><strong>URL:</strong> <a href="${escapeHtml(article.url)}">${escapeHtml(article.url)}</a></p>
-            ${published}
+            ${articleDate}
             ${excerpt}
           </section>
         </header>
