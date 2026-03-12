@@ -2,7 +2,7 @@
 
 Convert web articles into clean, paper-friendly PDFs for e-ink reading devices (for example, reMarkable).
 
-`sources2pdf` takes a text file with one URL per line, extracts the main article content with Mozilla Readability, renders a minimal print template, and exports one PDF per article.
+`sources2pdf` can process either a single URL (positional argument) or a text file with one URL per line, extracts the main article content with Mozilla Readability, renders a minimal print template, and exports one PDF per article.
 
 ## Why this exists
 
@@ -17,7 +17,7 @@ This tool focuses on a simple local pipeline:
 
 ## Features
 
-- CLI input: `-i` links file, `-o` output folder
+- CLI input: positional URL or `-i` links file, optional `-o` output folder
 - Handles blank lines and invalid URLs
 - Uses Playwright for JS-heavy sites
 - Uses `@mozilla/readability` + `jsdom` for main-content extraction
@@ -49,7 +49,23 @@ Then you can run `sources2pdf` directly.
 
 ## Usage
 
-### 1. Create an input file
+### 1. Single URL mode (quickest)
+
+Using Node directly:
+
+```bash
+node cli.js https://example.com/article
+```
+
+Or (after `npm link`):
+
+```bash
+sources2pdf https://example.com/article
+```
+
+If `-o` is not provided, PDFs are saved to the current directory.
+
+### 2. Batch mode from file
 
 Create `links.txt` with one URL per line:
 
@@ -60,7 +76,7 @@ https://example.com/article-2
 
 Blank lines are ignored.
 
-### 2. Run the CLI
+### 3. Run the CLI
 
 Using Node directly:
 
@@ -77,9 +93,10 @@ sources2pdf -i links.txt -o ./pdfs
 ## CLI options
 
 - `-i, --input <path>`: path to text file with one URL per line
-- `-o, --output <path>`: output folder for generated PDFs
+- `-o, --output <path>`: output folder for generated PDFs (defaults to current directory)
+- `[url]`: optional positional URL to process a single article
 
-Both are required.
+Provide exactly one input source: either `[url]` or `-i, --input <path>`.
 
 ## Output behavior
 

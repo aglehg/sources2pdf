@@ -10,22 +10,54 @@ const { buildPrintableHtml } = require('./src/renderTemplate');
 const { savePdf } = require('./src/savePdf');
 
 program
-  .requiredOption('-i, --input <path>', 'Path to text file with one URL per line')
-  .requiredOption('-o, --output <path>', 'Path to output folder for PDFs')
+  .argument('[url]', 'Single URL to convert')
+  .option('-i, --input <path>', 'Path to text file with one URL per line')
+  .option('-o, --output <path>', 'Path to output folder for PDFs (defaults to current directory)')
   .parse(process.argv);
 
 async function ensureDir(dirPath) {
   await fs.mkdir(dirPath, { recursive: true });
 }
 
+function isLikelyHttpUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
   const options = program.opts();
-  const inputPath = path.resolve(process.cwd(), options.input);
-  const outputDir = path.resolve(process.cwd(), options.output);
+  const positionalUrl = program.args[0] ? String(program.args[0]).trim() : null;
+  const outputDir = path.resolve(process.cwd(), options.output || '.');
 
   await ensureDir(outputDir);
 
-  const urls = await readUrls(inputPath);
+  if (positionalUrl && options.input) {
+    console.error('Use either a positional URL or -i/--input, not both.');
+    process.exitCode = 1;
+    return;
+  }
+
+  let urls = [];
+  if (positionalUrl) {
+    if (!isLikelyHttpUrl(positionalUrl)) {
+      console.error(`Invalid URL: ${positionalUrl}`);
+      process.exitCode = 1;
+      return;
+    }
+    urls = [positionalUrl];
+  } else if (options.input) {
+    const inputPath = path.resolve(process.cwd(), options.input);
+    urls = await readUrls(inputPath);
+  } else {
+    console.error('Provide either a positional URL or -i/--input <path>.');
+    process.exitCode = 1;
+    return;
+  }
+
   if (urls.length === 0) {
     console.error('No URLs found in input file.');
     process.exitCode = 1;
